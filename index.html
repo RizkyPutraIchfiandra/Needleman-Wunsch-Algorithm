@@ -79,13 +79,17 @@ body {
     "matrix matrix"
     "explain explain"
     "result  result";
+  overflow: hidden;
 }
+.bento > * { min-width: 0; }
 
 .bcard {
   background: var(--card);
   border: var(--border-w) solid var(--border);
   padding: 20px;
   box-shadow: var(--shadow);
+  min-width: 0;
+  overflow: hidden;
 }
 .bcard-label {
   font-size: 0.72rem;
@@ -253,9 +257,9 @@ body {
 .li { display: flex; align-items: center; gap: 6px; }
 .ld { width: 16px; height: 16px; border: 2px solid var(--border); }
 
-.matrix-scroll-wrap { overflow-x: auto; width: 100%; }
-.matrix-wrapper { text-align: center; margin-bottom: 14px; }
-#matrix-capture { display: inline-block; background: var(--card); padding: 16px; }
+.matrix-scroll-wrap { overflow-x: auto; width: 100%; max-width: 100%; }
+.matrix-wrapper { text-align: center; margin-bottom: 14px; overflow-x: auto; }
+#matrix-capture { display: inline-block; background: var(--card); padding: 16px; max-width: 100%; }
 
 .matrix { border-collapse: collapse; margin: 0 auto; }
 .matrix th {
