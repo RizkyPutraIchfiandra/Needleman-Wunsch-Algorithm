@@ -71,14 +71,15 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    "input  input"
-    "seqbox params"
-    "ctrl   ctrl"
-    "matrix matrix"
-    "explain explain"
-    "result  result";
+    "input"
+    "seqbox"
+    "params"
+    "ctrl"
+    "matrix"
+    "explain"
+    "result";
   overflow: hidden;
 }
 .bento > * { min-width: 0; }
@@ -206,7 +207,7 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.params { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .pc {
   background: var(--surface);
   border: 2px solid var(--border);
