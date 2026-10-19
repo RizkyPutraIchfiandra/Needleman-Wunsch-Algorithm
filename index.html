@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Needleman-Wunsch Algorithm — Neobrutalism</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #1a1a1a;
+  --card: #252525;
+  --border: #000;
+  --text: #fff;
+  --sub: #a0a0a0;
+  --accent: #ffe135;
+  --green: #39ff14;
+  --red: #ff3131;
+  --blue: #00d4ff;
+  --purple: #bf5fff;
+  --orange: #ff6b35;
+  --pink: #ff69b4;
+  --font-mono: "Courier New", monospace;
+  --radius: 0;
+  --border-w: 3px;
+  --shadow: 4px 4px 0 #000;
+  --shadow-lg: 6px 6px 0 #000;
+}
+
+html[data-theme="light"] {
+  --bg: #f5f5dc;
+  --surface: #fff8e7;
+  --card: #ffffff;
+  --border: #000;
+  --text: #000;
+  --sub: #555;
+  --shadow: 4px 4px 0 #000;
+  --shadow-lg: 6px 6px 0 #000;
+}
+
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 0 0 48px;
+}
+
+/* HEADER */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 24px auto 20px;
+  padding: 0 20px;
+}
+.page-header h1 {
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  color: var(--accent);
+  text-shadow: 3px 3px 0 var(--border);
+}
+.page-header p {
+  color: var(--sub);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.theme-toggle {
+  width: 48px;
+  height: 48px;
+  background: var(--accent);
+  border: var(--border-w) solid var(--border);
+  cursor: pointer;
+  font-size: 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.1s;
+}
+.theme-toggle:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #000; }
+.theme-toggle:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #000; }
+
+/* BENTO GRID */
+.bento {
+  display: grid;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "input  input"
+    "seqbox params"
+    "ctrl   ctrl"
+    "matrix matrix"
+    "explain explain"
+    "result  result";
+}
+
+.bcard {
+  background: var(--card);
+  border: var(--border-w) solid var(--border);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.bcard-label {
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bcard-label::before {
+  content: "▌";
+  color: var(--green);
+}
+
+.b-input { grid-area: input; }
+.b-seqbox { grid-area: seqbox; }
+.b-params { grid-area: params; }
+.b-ctrl { grid-area: ctrl; }
+.b-matrix { grid-area: matrix; }
+.b-explain { grid-area: explain; }
+.b-result { grid-area: result; display: none; }
+.b-result.visible { display: block; }
+
+/* PRESETS */
+.presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.preset-label { font-size: 0.75rem; color: var(--sub); font-weight: 700; text-transform: uppercase; }
+.preset-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 2px 2px 0 #000;
+  transition: all 0.1s;
+}
+.preset-btn:hover {
+  background: var(--accent);
+  color: #000;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #000;
+}
+
+/* INPUTS */
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.ig { display: flex; flex-direction: column; gap: 6px; }
+.ig label, .si label {
+  font-size: 0.7rem;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 800;
+}
+.ig input, .si input {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  padding: 12px 14px;
+  font-size: 1rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.2);
+}
+.ig input:focus, .si input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.ig input.input-ok { border-color: var(--green) !important; }
+.ig input.input-err { border-color: var(--red) !important; }
+.input-hint { font-size: 0.7rem; margin-top: 4px; font-weight: 600; }
+.input-hint.ok { color: var(--green); }
+.input-hint.err { color: var(--red); }
+
+.score-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.si { display: flex; align-items: center; gap: 8px; }
+.si input { width: 60px; text-align: center; padding: 10px 8px; }
+
+/* BUTTONS */
+.btn {
+  padding: 10px 18px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 3px 3px 0 #000;
+  transition: all 0.1s;
+}
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #000; }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: 3px 3px 0 #000 !important; }
+
+.btn-gen { background: var(--accent); color: #000; }
+.btn-p { background: var(--blue); color: #000; }
+.btn-prev { background: var(--surface); color: var(--text); }
+.btn-s { background: var(--purple); color: #fff; }
+.btn-g { background: var(--green); color: #000; }
+.btn-img { background: var(--pink); color: #000; }
+.btn-xls { background: var(--orange); color: #000; }
+
+.btn.loading { opacity: 0.7; pointer-events: none; }
+.btn.loading::after {
+  content: ""; display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(0,0,0,0.3); border-top-color: #000;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+  margin-left: 8px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* PARAMS CARDS */
+.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pc {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  padding: 14px;
+  box-shadow: 2px 2px 0 #000;
+}
+.pc .lbl { font-size: 0.65rem; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; }
+.pc .val { font-size: 1.6rem; font-weight: 900; margin-top: 6px; }
+.match-c { color: var(--green); }
+.mis-c { color: var(--orange); }
+.gap-c { color: var(--red); }
+.score-c { color: var(--blue); }
+
+/* SEQ DISPLAY */
+.seq-display { display: flex; flex-direction: column; gap: 12px; }
+.seq-box {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  padding: 12px;
+  box-shadow: 2px 2px 0 #000;
+}
+.seq-lbl { font-size: 0.65rem; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; margin-bottom: 8px; }
+.seq-letters { display: flex; gap: 4px; flex-wrap: wrap; }
+.seq-letters span {
+  background: var(--accent);
+  color: #000;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 0.9rem;
+  border: 2px solid var(--border);
+}
+
+/* CONTROLS */
+.inner-ctrl { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.ctrl-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.step-info {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  padding: 10px 16px;
+  color: var(--orange);
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.progress-wrap { width: 100%; height: 8px; background: var(--surface); border: 2px solid var(--border); margin-top: 12px; }
+.progress-bar { height: 100%; width: 0%; background: var(--green); transition: width 0.2s; }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.75rem; margin-top: 14px; font-weight: 700; }
+.li { display: flex; align-items: center; gap: 6px; }
+.ld { width: 14px; height: 14px; border: 2px solid var(--border); }
+
+/* MATRIX */
+.matrix-scroll-wrap { overflow-x: auto; width: 100%; }
+.matrix-wrapper { text-align: center; margin-bottom: 14px; }
+#matrix-capture { display: inline-block; background: var(--card); padding: 16px; }
+
+.matrix { border-collapse: collapse; margin: 0 auto; }
+.matrix th {
+  background: var(--accent);
+  color: #000;
+  font-size: 0.95rem;
+  font-weight: 900;
+  padding: 10px 12px;
+  min-width: 52px;
+  border: 2px solid var(--border);
+}
+.matrix .corner { background: var(--card); border: none; }
+
+.cell-4 { padding: 0; border: 2px solid var(--border); position: relative; }
+.cell-4 .inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100px;
+  height: 80px;
+}
+.cell-4 .inner div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border: 1px solid rgba(0,0,0,0.2);
+}
+.dg { background: #1a3d1a; color: var(--green); }
+.tp { background: #3d1a1a; color: var(--red); }
+.lt { background: #3d3d1a; color: var(--orange); }
+.mx { background: #1a2a3d; color: var(--blue); font-weight: 900; font-size: 0.95rem; }
+
+html[data-theme="light"] .dg { background: #d4ffd4; color: #006400; }
+html[data-theme="light"] .tp { background: #ffd4d4; color: #8b0000; }
+html[data-theme="light"] .lt { background: #fff4d4; color: #8b4500; }
+html[data-theme="light"] .mx { background: #d4f4ff; color: #00008b; }
+
+.init-cell {
+  background: var(--accent);
+  color: #000;
+  font-weight: 900;
+  font-size: 1rem;
+  border: 2px solid var(--border);
+  padding: 10px 12px;
+  min-width: 52px;
+  position: relative;
+}
+
+.tb-ring { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.traced .tb-ring { display: block; border: 4px solid var(--green); background: rgba(57,255,20,0.15); }
+.active .tb-ring { display: block; border: 4px solid var(--orange); background: rgba(255,107,53,0.15); }
+.cell-4.src { background: rgba(255,107,53,0.1); }
+
+.mc-stats { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; }
+.mc-stats span { padding: 6px 14px; background: var(--surface); border: 2px solid var(--border); }
+.mc-stats .s-match { color: var(--green); }
+.mc-stats .s-mis { color: var(--orange); }
+.mc-stats .s-gap { color: var(--red); }
+.mc-stats .s-score { color: var(--blue); }
+
+.dl-row { display: flex; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+/* EXPLAIN */
+.explain h3 { color: var(--accent); font-size: 1rem; margin-bottom: 10px; text-transform: uppercase; }
+.calc {
+  background: var(--surface);
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  margin: 10px 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.9;
+  box-shadow: 2px 2px 0 #000;
+}
+
+/* RESULT */
+.result { text-align: center; }
+.result h3 { color: var(--green); font-size: 1rem; margin-bottom: 14px; text-transform: uppercase; }
+.align-block { display: inline-block; text-align: left; font-family: var(--font-mono); }
+.align-row { display: flex; align-items: center; margin: 4px 0; }
+.align-lbl { font-size: 0.85rem; color: var(--sub); width: 2.4em; text-align: right; margin-right: 10px; font-weight: 800; }
+.align-chars { display: flex; }
+.align-chars span { display: inline-flex; align-items: center; justify-content: center; width: 1.7em; font-size: 1rem; font-weight: 900; }
+.mc { color: var(--green); }
+.mmc { color: var(--orange); }
+
+/* TOAST */
+#toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--accent);
+  color: #000;
+  padding: 12px 24px;
+  border: 3px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  z-index: 999;
+  transition: transform 0.3s, opacity 0.3s;
+  opacity: 0;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* MODAL */
+#modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+#modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--card);
+  border: 4px solid var(--border);
+  padding: 28px 32px;
+  max-width: 340px;
+  width: 90%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.modal-box h3 { font-size: 1.1rem; margin-bottom: 10px; text-transform: uppercase; }
+.modal-box p { font-size: 0.85rem; color: var(--sub); margin-bottom: 20px; }
+.modal-btns { display: flex; gap: 10px; justify-content: center; }
+
+.err { color: var(--red); font-size: 0.85rem; margin-top: 6px; display: none; font-weight: 700; }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .bento {
+    grid-template-columns: 1fr;
+    grid-template-areas: "input" "seqbox" "params" "ctrl" "matrix" "explain" "result";
+  }
+  .cell-4 .inner { width: 80px; height: 66px; }
+  .cell-4 .inner div { font-size: 0.72rem; }
+}
+@media (max-width: 600px) {
+  .input-grid { grid-template-columns: 1fr; }
+  .cell-4 .inner { width: 64px; height: 52px; }
+  .cell-4 .inner div { font-size: 0.6rem; }
+  .matrix th, .init-cell { font-size: 0.75rem; padding: 7px 8px; min-width: 36px; }
+  .btn { padding: 8px 14px; font-size: 0.75rem; }
+}
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <div class="header-text">
+      <h1>Needleman-Wunsch</h1>
+      <p>Global Sequence Alignment Algorithm</p>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+      <span id="themeIcon">🌙</span>
+    </button>
+  </header>
+
+  <main class="bento">
+    <!-- INPUT -->
+    <section class="bcard b-input">
+      <div class="bcard-label">Input Sekuens</div>
+      <div class="presets">
+        <span class="preset-label">Preset:</span>
+        <button class="preset-btn" onclick="loadPreset('kelompok4')">Kelompok 4</button>
+        <button class="preset-btn" onclick="loadPreset('simple')">Simple</button>
+        <button class="preset-btn" onclick="loadPreset('gap')">Gap Test</button>
+        <button class="preset-btn" onclick="loadPreset('long')">Long</button>
+      </div>
+      <div class="input-grid">
+        <div class="ig">
+          <label for="inSeqH">Sekuens A (horizontal)</label>
+          <input type="text" id="inSeqH" placeholder="ACGT..." maxlength="15" oninput="validateSeq(this,'hintH')">
+          <div class="input-hint" id="hintH"></div>
+        </div>
+        <div class="ig">
+          <label for="inSeqV">Sekuens B (vertikal)</label>
+          <input type="text" id="inSeqV" placeholder="ACGT..." maxlength="15" oninput="validateSeq(this,'hintV')">
+          <div class="input-hint" id="hintV"></div>
+        </div>
+      </div>
+      <div class="score-row">
+        <div class="si"><label>Match</label><input type="number" id="inMatch" value="2"></div>
+        <div class="si"><label>Mismatch</label><input type="number" id="inMis" value="-1"></div>
+        <div class="si"><label>Gap</label><input type="number" id="inGap" value="-2"></div>
+        <button class="btn btn-gen" onclick="generate()">Generate ▶</button>
+      </div>
+      <div class="err" id="errMsg"></div>
+    </section>
+
+    <!-- DYNAMIC CONTENT -->
+    <div id="dyn"></div>
+  </main>
+
+  <div id="toast"></div>
+  <div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <h3>Reset Matriks?</h3>
+      <p>Semua progress akan dihapus dan matriks kembali kosong.</p>
+      <div class="modal-btns">
+        <button class="btn btn-s" onclick="closeModal()">Batal</button>
+        <button class="btn btn-g" onclick="confirmReset()">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// Theme
+(function initTheme(){const s=localStorage.getItem("nw-theme")||"dark";applyTheme(s,false)})();
+function applyTheme(t,a){const h=document.documentElement;if(a)h.classList.add("theme-ready");h.setAttribute("data-theme",t);localStorage.setItem("nw-theme",t);const i=document.getElementById("themeIcon"),m=document.querySelector('meta[name="theme-color"]');if(t==="light"){if(i)i.textContent="☀️";if(m)m.setAttribute("content","#f5f5dc")}else{if(i)i.textContent="🌙";if(m)m.setAttribute("content","#0a0a0a")}}
+function toggleTheme(){const c=document.documentElement.getAttribute("data-theme")||"dark";applyTheme(c==="dark"?"light":"dark",true);showToast(document.documentElement.getAttribute("data-theme")==="light"?"☀️ Light mode":"🌙 Dark mode")}
+
+const PRESETS={kelompok4:{h:"CTACGCATC",v:"CAAGCCTAC",m:2,mi:1,g:-1},simple:{h:"ACGT",v:"AGT",m:2,mi:-1,g:-2},gap:{h:"AGTACG",v:"ACATAG",m:2,mi:1,g:-1},long:{h:"ATCGATCGATCG",v:"ATGCATGCATGC",m:1,mi:-1,g:-2}};
+function loadPreset(k){const d=PRESETS[k];$("inSeqH").value=d.h;$("inSeqV").value=d.v;$("inMatch").value=d.m;$("inMis").value=d.mi;$("inGap").value=d.g;validateSeq($("inSeqH"),"hintH");validateSeq($("inSeqV"),"hintV")}
+function validateSeq(i,hId){const r=i.value.toUpperCase(),c=r.replace(/[^ACGTN]/g,""),h=$(hId);i.classList.remove("input-ok","input-err");if(!r){h.textContent="";h.className="input-hint";return}if(r!==c){i.classList.add("input-err");h.textContent="Hanya A, C, G, T, N";h.className="input-hint err";return}if(c.length>15){i.classList.add("input-err");h.textContent="Max 15 karakter";h.className="input-hint err";return}i.classList.add("input-ok");h.textContent=c.length+" basa ✓";h.className="input-hint ok"}
+
+let toastTimer;
+function showToast(m,d=2500){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),d)}
+function openModal(){$("modal-overlay").classList.add("open")}
+function closeModal(){$("modal-overlay").classList.remove("open")}
+function confirmReset(){closeModal();_doReset()}
+
+let seqH,seqV,MATCH,MIS,GAP,rows,cols,matrix,steps,cur,tbPath;
+const $=id=>document.getElementById(id);
+const sign=n=>n>=0?"+"+n:n;
+function escapeHTML(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function safeInt(id,f){const v=parseInt($(id).value);return isNaN(v)?f:v}
+
+function generate(){
+  const err=$("errMsg"),h=$("inSeqH").value.toUpperCase().replace(/[^ACGTN]/g,""),v=$("inSeqV").value.toUpperCase().replace(/[^ACGTN]/g,"");
+  if(!h||!v){err.textContent="Sekuens minimal 1 huruf";err.style.display="block";return}
+  if(h.length>15||v.length>15){err.textContent="Max 15 huruf";err.style.display="block";return}
+  err.style.display="none";
+  seqH=h.split("");seqV=v.split("");MATCH=safeInt("inMatch",2);MIS=safeInt("inMis",-1);GAP=safeInt("inGap",-2);
+  rows=seqV.length+1;cols=seqH.length+1;cur=0;tbPath=[];
+  buildMatrix();renderUI()
+}
+
+function buildMatrix(){
+  matrix=Array.from({length:rows},()=>Array.from({length:cols},()=>({d:0,t:0,l:0,m:0})));steps=[];
+  for(let j=0;j<cols;j++)matrix[0][j].m=j*GAP;
+  for(let i=1;i<rows;i++)matrix[i][0].m=i*GAP;
+  for(let i=1;i<rows;i++)for(let j=1;j<cols;j++){
+    const s=seqV[i-1]===seqH[j-1]?MATCH:MIS;
+    const d=matrix[i-1][j-1].m+s,t=matrix[i-1][j].m+GAP,l=matrix[i][j-1].m+GAP,mx=Math.max(d,t,l);
+    matrix[i][j]={d,t,l,m:mx};
+    steps.push({i,j,d,t,l,mx,s,cv:seqV[i-1],ch:seqH[j-1]})
+  }
+  tbPath=[];let i=rows-1,j=cols-1;
+  while(i>0||j>0){tbPath.push([i,j]);if(i>0&&j>0&&matrix[i][j].m===matrix[i][j].d){i--;j--}else if(i>0&&matrix[i][j].m===matrix[i][j].t){i--}else{j--}}
+  tbPath.push([0,0])
+}
+
+function renderUI(){
+  $("dyn").innerHTML=`
+    <div class="bcard b-seqbox"><div class="bcard-label">Sekuens</div><div class="seq-display">
+      <div class="seq-box"><div class="seq-lbl">Sekuens A (horizontal)</div><div class="seq-letters">${seqH.map(c=>`<span>${escapeHTML(c)}</span>`).join("")}</div></div>
+      <div class="seq-box"><div class="seq-lbl">Sekuens B (vertikal)</div><div class="seq-letters">${seqV.map(c=>`<span>${escapeHTML(c)}</span>`).join("")}</div></div>
+    </div></div>
+    <div class="bcard b-params"><div class="bcard-label">Parameter</div><div class="params">
+      <div class="pc"><div class="lbl">Match</div><div class="val match-c">${sign(MATCH)}</div></div>
+      <div class="pc"><div class="lbl">Mismatch</div><div class="val mis-c">${sign(MIS)}</div></div>
+      <div class="pc"><div class="lbl">Gap</div><div class="val gap-c">${sign(GAP)}</div></div>
+      <div class="pc"><div class="lbl">Final Score</div><div class="val score-c" id="fs">—</div></div>
+    </div></div>
+    <div class="bcard b-ctrl"><div class="bcard-label">Kontrol</div><div class="inner-ctrl">
+      <div class="ctrl-btns">
+        <button class="btn btn-s" id="btnReset" onclick="doReset()">↺ Reset</button>
+        <button class="btn btn-prev" id="btnPrev" onclick="doPrev()" disabled>◀ Mundur</button>
+        <button class="btn btn-p" id="btnStep" onclick="doStep()">Langkah ▶</button>
+        <button class="btn btn-p" id="btnFill" onclick="doFillBtn()">Isi Semua ⏩</button>
+        <button class="btn btn-g" id="btnTrace" onclick="doTrace()">Traceback 🔍</button>
+      </div>
+      <div class="step-info" id="si">Klik "Langkah ▶" untuk mulai</div>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="prog"></div></div>
+    <div class="legend">
+      <div class="li"><div class="ld" style="background:var(--green)"></div>↖ Diagonal</div>
+      <div class="li"><div class="ld" style="background:var(--red)"></div>↑ Atas</div>
+      <div class="li"><div class="ld" style="background:var(--orange)"></div>← Kiri</div>
+      <div class="li"><div class="ld" style="background:var(--blue)"></div>★ MAX</div>
+    </div></div>
+    <div class="bcard b-matrix"><div class="bcard-label">DP Matrix</div>
+      <div class="matrix-scroll-wrap"><div class="matrix-wrapper"><div id="matrix-capture">
+        <div class="mc-stats" id="mc-stats" style="display:none"></div>
+        <table class="matrix" id="mt"></table>
+      </div></div></div>
+      <div class="dl-row">
+        <button class="btn btn-img" onclick="dlMatrixImg()">📷 PNG</button>
+        <button class="btn btn-xls" onclick="dlMatrixExcel()">📊 Excel</button>
+      </div>
+    </div>
+    <div class="bcard b-explain" id="ep"><div class="bcard-label">Penjelasan</div>
+      <h3>Cara Membaca Sel</h3>
+      <div class="calc"><div>↖ = sel diagonal + match/mismatch</div><div>↑ = sel atas + gap (${GAP})</div><div>← = sel kiri + gap (${GAP})</div><div>★ = MAX dari ketiganya</div></div>
+    </div>
+    <div class="bcard b-result" id="rp"></div>`;
+  buildTable()
+}
+
+function buildTable(){
+  const f=document.createDocumentFragment(),t=$("mt");t.innerHTML="";
+  const hr=document.createElement("tr");
+  hr.innerHTML=`<th class="corner"></th><th>-</th>${seqH.map(c=>`<th>${escapeHTML(c)}</th>`).join("")}`;
+  f.appendChild(hr);
+  for(let i=0;i<rows;i++){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<th>${i===0?"-":escapeHTML(seqV[i-1])}</th>`;
+    for(let j=0;j<cols;j++){
+      const td=document.createElement("td");td.id=`c${i}-${j}`;
+      if(i===0||j===0){td.className="init-cell";td.innerHTML=`<span>${matrix[i][j].m}</span><div class="tb-ring"></div>`}
+      else{td.className="cell-4";td.innerHTML=`<div class="inner"><div class="dg" id="d${i}-${j}"></div><div class="tp" id="t${i}-${j}"></div><div class="lt" id="l${i}-${j}"></div><div class="mx" id="m${i}-${j}"></div></div><div class="tb-ring"></div>`}
+      tr.appendChild(td)
+    }
+    f.appendChild(tr)
+  }
+  t.appendChild(f)
+}
+
+function epDefault(){$("ep").innerHTML=`<div class="bcard-label">Penjelasan</div><h3>Cara Membaca Sel</h3><div class="calc"><div>↖ = sel diagonal + match/mismatch</div><div>↑ = sel atas + gap (${GAP})</div><div>← = sel kiri + gap (${GAP})</div><div>★ = MAX dari ketiganya</div></div>`}
+function epStep(s){const im=s.s===MATCH,mc=im?"var(--green)":"var(--orange)";$("ep").innerHTML=`<div class="bcard-label">Penjelasan</div><h3>Sel (${escapeHTML(s.cv)}, ${escapeHTML(s.ch)}) — Baris ${s.i}, Kolom ${s.j}</h3><p style="font-size:0.85rem;margin-bottom:8px"><span style="color:${mc}">${escapeHTML(s.cv)} vs ${escapeHTML(s.ch)} = ${im?"Match ✓":"Mismatch ✗"} (${sign(s.s)})</span></p><div class="calc"><div><span style="color:var(--green)">↖ Diagonal:</span> ${matrix[s.i-1][s.j-1].m} + (${sign(s.s)}) = <b>${s.d}</b></div><div><span style="color:var(--red)">↑ Atas:</span> ${matrix[s.i-1][s.j].m} + (${GAP}) = <b>${s.t}</b></div><div><span style="color:var(--orange)">← Kiri:</span> ${matrix[s.i][s.j-1].m} + (${GAP}) = <b>${s.l}</b></div><div style="margin-top:8px;border-top:2px solid var(--border);padding-top:8px"><span style="color:var(--blue)">★ MAX(${s.d}, ${s.t}, ${s.l}) = <b>${s.mx}</b></span></div></div>`}
+
+let _prev=[];
+function highlightStep(s){for(const e of _prev)e.classList.remove("active","src");_prev=[];const a=$(`c${s.i}-${s.j}`),s1=$(`c${s.i-1}-${s.j-1}`),s2=$(`c${s.i-1}-${s.j}`),s3=$(`c${s.i}-${s.j-1}`);if(a){a.classList.add("active");_prev.push(a)}if(s1){s1.classList.add("src");_prev.push(s1)}if(s2){s2.classList.add("src");_prev.push(s2)}if(s3){s3.classList.add("src");_prev.push(s3)}}
+function fillCell(s){$(`d${s.i}-${s.j}`).textContent=s.d;$(`t${s.i}-${s.j}`).textContent=s.t;$(`l${s.i}-${s.j}`).textContent=s.l;$(`m${s.i}-${s.j}`).textContent=s.mx}
+function clearCell(s){$(`d${s.i}-${s.j}`).textContent="";$(`t${s.i}-${s.j}`).textContent="";$(`l${s.i}-${s.j}`).textContent="";$(`m${s.i}-${s.j}`).textContent=""}
+function setProgress(n,t){const p=t>0?Math.round(n/t*100):0;$("prog").style.width=p+"%";$("si").textContent=n===0?'Klik "Langkah ▶" untuk mulai':`Langkah ${n} dari ${t} sel`}
+function updateNavBtns(){const bp=$("btnPrev");if(!bp)return;bp.disabled=cur<=0;const d=cur>=steps.length;$("btnStep").disabled=d;$("btnFill").disabled=d}
+
+function doStep(){if(cur>=steps.length)return;const s=steps[cur];fillCell(s);highlightStep(s);epStep(s);cur++;setProgress(cur,steps.length);if(cur===steps.length){$("fs").textContent=s.mx;showToast("✅ Semua sel terisi! Klik Traceback")}updateNavBtns()}
+function doPrev(){if(cur<=0){showToast("ℹ️ Sudah di awal");return}cur--;const s=steps[cur];clearCell(s);for(const e of _prev)e.classList.remove("active","src");_prev=[];document.querySelectorAll(".traced").forEach(e=>e.classList.remove("traced"));$("rp").classList.remove("visible");$("fs").textContent="—";if(cur===0){setProgress(0,steps.length);epDefault()}else{const p=steps[cur-1];highlightStep(p);epStep(p);setProgress(cur,steps.length)}updateNavBtns()}
+function doFillBtn(){doFill(false)}
+function doFill(s){if(typeof s!=="boolean")s=false;if(cur>=steps.length){if(!s)showToast("Matriks sudah penuh");return}const b=$("btnFill");b.classList.add("loading");b.textContent="...";requestAnimationFrame(()=>requestAnimationFrame(()=>{while(cur<steps.length){fillCell(steps[cur]);cur++}const l=steps[steps.length-1];highlightStep(l);epStep(l);setProgress(cur,steps.length);$("fs").textContent=l.mx;b.classList.remove("loading");b.textContent="Isi Semua ⏩";updateNavBtns();if(!s)showToast("✅ Semua sel terisi!")}))}
+function doReset(){if(cur===0){showToast("ℹ️ Matriks kosong");return}openModal()}
+function _doReset(){cur=0;for(const e of _prev)e.classList.remove("active","src");_prev=[];document.querySelectorAll(".traced").forEach(e=>e.classList.remove("traced"));$("fs").textContent="—";setProgress(0,steps.length);$("rp").classList.remove("visible");const mc=$("mc-stats");if(mc){mc.style.display="none";mc.innerHTML=""}for(const s of steps)clearCell(s);epDefault();showToast("↺ Reset");updateNavBtns()}
+
+function doTrace(){if(cur<steps.length){const b=$("btnFill");b.classList.add("loading");requestAnimationFrame(()=>requestAnimationFrame(()=>{while(cur<steps.length){fillCell(steps[cur]);cur++}b.classList.remove("loading");b.textContent="Isi Semua ⏩";$("fs").textContent=steps[steps.length-1].mx;setProgress(cur,steps.length);updateNavBtns();_runTrace()}))}else{_runTrace()}}
+
+function _runTrace(){for(const e of _prev)e.classList.remove("active","src");_prev=[];for(const[i,j]of tbPath)$(`c${i}-${j}`).classList.add("traced");
+const aH=[],aV=[],mk=[];let ti=rows-1,tj=cols-1;
+while(ti>0||tj>0){if(ti>0&&tj>0&&matrix[ti][tj].m===matrix[ti][tj].d){aH.unshift(seqH[tj-1]);aV.unshift(seqV[ti-1]);mk.unshift(seqH[tj-1]===seqV[ti-1]?"|":".");ti--;tj--}else if(ti>0&&(tj===0||matrix[ti][tj].m===matrix[ti][tj].t)){aH.unshift("-");aV.unshift(seqV[ti-1]);mk.unshift(" ");ti--}else if(tj>0){aH.unshift(seqH[tj-1]);aV.unshift("-");mk.unshift(" ");tj--}else break}
+const mCnt=mk.filter(x=>x==="|").length,miCnt=mk.filter(x=>x===".").length,gCnt=mk.filter(x=>x===" ").length,score=matrix[rows-1][cols-1].m;
+const chA=aH.map((c,k)=>`<span class="${mk[k]==="|"?"mc":mk[k]==="."?"mmc":""}">${escapeHTML(c)}</span>`).join("");
+const chM=mk.map((c,k)=>`<span class="${c==="|"?"mc":c==="."?"mmc":""}">${c==="|"?"|":c==="."?"·":"&nbsp;"}</span>`).join("");
+const chB=aV.map((c,k)=>`<span class="${mk[k]==="|"?"mc":mk[k]==="."?"mmc":""}">${escapeHTML(c)}</span>`).join("");
+const mc=$("mc-stats");mc.style.display="flex";mc.innerHTML=`<span class="s-match">Match: ${mCnt}</span><span class="s-mis">Mismatch: ${miCnt}</span><span class="s-gap">Gap: ${gCnt}</span><span class="s-score">Skor: ${score}</span>`;
+const rp=$("rp");rp.classList.add("visible");rp.innerHTML=`<div class="bcard-label">Hasil</div><h3>Alignment Optimal</h3><div style="display:flex;justify-content:center"><div class="align-block"><div class="align-row"><span class="align-lbl">A:</span><div class="align-chars">${chA}</div></div><div class="align-row"><span class="align-lbl"></span><div class="align-chars">${chM}</div></div><div class="align-row"><span class="align-lbl">B:</span><div class="align-chars">${chB}</div></div></div></div><div class="dl-row"><button class="btn btn-img" onclick="dlResultImg()">📷 Download</button></div>`;
+$("ep").innerHTML=`<div class="bcard-label">Penjelasan</div><h3>Traceback Path</h3><p style="font-size:0.85rem;color:var(--sub)">Jalur <span style="color:var(--green);font-weight:900">hijau</span> = traceback dari kanan bawah → kiri atas</p>`;
+showToast("🔍 Traceback selesai!")}
+
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
+
+let _h2cP=null;
+function loadH2C(){if(!_h2cP){_h2cP=new Promise((r,x)=>{if(window.html2canvas){r(window.html2canvas);return}const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";s.onload=()=>r(window.html2canvas);s.onerror=()=>{_h2cP=null;x(new Error("fail"))};document.head.appendChild(s)})}return _h2cP}
+async function capture(el,bg){const h=await loadH2C();return h(el,{backgroundColor:bg,scale:2,useCORS:true,logging:false})}
+function triggerDl(c,n){const a=document.createElement("a");a.download=n;a.href=c.toDataURL("image/png");a.click()}
+async function dlMatrixImg(){if(cur<steps.length){while(cur<steps.length){fillCell(steps[cur]);cur++}const l=steps[steps.length-1];highlightStep(l);epStep(l);setProgress(cur,steps.length);$("fs").textContent=l.mx;updateNavBtns()}await new Promise(r=>requestAnimationFrame(r));const lt=document.documentElement.getAttribute("data-theme")==="light";try{triggerDl(await capture($("matrix-capture"),lt?"#ffffff":"#252525"),"dp_matrix.png")}catch(e){showToast("⚠️ Gagal")}}
+async function dlResultImg(){const el=$("rp"),cl=el.cloneNode(true);const dr=cl.querySelector(".dl-row");if(dr)dr.remove();Object.assign(cl.style,{position:"fixed",top:"-9999px",left:"-9999px",width:el.offsetWidth+"px"});document.body.appendChild(cl);await new Promise(r=>requestAnimationFrame(r));const lt=document.documentElement.getAttribute("data-theme")==="light";try{triggerDl(await capture(cl,lt?"#ffffff":"#252525"),"alignment.png")}catch(e){showToast("⚠️ Gagal")}document.body.removeChild(cl)}
+
+// Excel (simplified from original)
+function colLetter(i){let s="";i++;while(i>0){s=String.fromCharCode(64+(i%26||26))+s;i=Math.floor((i-1)/26)}return s}
+function dlMatrixExcel(){if(!matrix)return;showToast("📊 Generating Excel...");setTimeout(()=>{const csv=["Needleman-Wunsch DP Matrix","","SeqA:,"+seqH.join(","),"SeqB:,"+seqV.join(","),"Match:,"+MATCH+",Mismatch:,"+MIS+",Gap:,"+GAP,"",""].join("\n");let hdr=",,-,"+seqH.join(",")+"\n";let body="";for(let i=0;i<rows;i++){const lbl=i===0?"-":seqV[i-1];let row=[lbl,""];for(let j=0;j<cols;j++){if(i===0||j===0)row.push(matrix[i][j].m);else row.push(`D:${matrix[i][j].d} T:${matrix[i][j].t} L:${matrix[i][j].l} M:${matrix[i][j].m}`)}body+=row.join(",")+"\n"}const blob=new Blob([csv+hdr+body],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="dp_matrix.csv";a.click();showToast("📊 CSV downloaded")},100)}
+  </script>
+</body>
+</html>
