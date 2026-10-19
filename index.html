@@ -260,7 +260,7 @@ body {
 
 .matrix-scroll-wrap { overflow-x: auto; width: 100%; max-width: 100%; }
 .matrix-wrapper { text-align: center; margin-bottom: 14px; overflow-x: auto; }
-#matrix-capture { display: inline-block; background: var(--card); padding: 16px; max-width: 100%; }
+#matrix-capture { display: inline-block; background: var(--card); padding: 16px; }
 
 .matrix { border-collapse: collapse; margin: 0 auto; }
 .matrix th {
@@ -597,7 +597,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 
 let _h2cP=null;
 function loadH2C(){if(!_h2cP){_h2cP=new Promise((r,x)=>{if(window.html2canvas){r(window.html2canvas);return}const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";s.onload=()=>r(window.html2canvas);s.onerror=()=>{_h2cP=null;x(new Error("fail"))};document.head.appendChild(s)})}return _h2cP}
-async function capture(el,bg){const h=await loadH2C();return h(el,{backgroundColor:bg,scale:2,useCORS:true,logging:false})}
+async function capture(el,bg){const h=await loadH2C();return h(el,{backgroundColor:bg,scale:2,useCORS:true,logging:false,scrollX:0,scrollY:0,windowWidth:el.scrollWidth+100,windowHeight:el.scrollHeight+100})}
 function triggerDl(c,n){const a=document.createElement("a");a.download=n;a.href=c.toDataURL("image/png");a.click()}
 async function dlMatrixImg(){if(cur<steps.length){while(cur<steps.length){fillCell(steps[cur]);cur++}const l=steps[steps.length-1];highlightStep(l);epStep(l);setProgress(cur,steps.length);$("fs").textContent=l.mx;updateNavBtns()}await new Promise(r=>requestAnimationFrame(r));try{triggerDl(await capture($("matrix-capture"),"#ffffff"),"dp_matrix.png")}catch(e){showToast("⚠️ Gagal")}}
 async function dlResultImg(){const el=$("rp"),cl=el.cloneNode(true);const dr=cl.querySelector(".dl-row");if(dr)dr.remove();Object.assign(cl.style,{position:"fixed",top:"-9999px",left:"-9999px",width:el.offsetWidth+"px"});document.body.appendChild(cl);await new Promise(r=>requestAnimationFrame(r));try{triggerDl(await capture(cl,"#f0fff0"),"alignment.png")}catch(e){showToast("⚠️ Gagal")}document.body.removeChild(cl)}
